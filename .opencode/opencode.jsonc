@@ -15,4 +15,8 @@
     "github-triage": false,
     "github-pr-search": false,
   },
+  // Multi-agent SDLC framework — default agent for new sessions
+  // Set to "orchestrator" to start every session in the SDLC coordinator.
+  // Change to "build" to restore the standard OpenCode experience.
+  // "default_agent": "orchestrator",
 }

@@ -1,18 +1,15 @@
 ---
-description: Run only the testing phase — integration tests, E2E tests, and test report
+description: Run only the integration and E2E testing phase — reads from artifacts, writes 04-test-report.md
 agent: test
 subtask: true
 ---
 
-Run the full testing suite for the implemented feature.
+Execute Phase 4 (Integration & E2E Testing) of the SDLC pipeline.
 
-Read `.opencode/sdlc/requirements.md` for BDD acceptance criteria and `.opencode/sdlc/development.md` for implementation details. Supplement with any additional context below.
+Read:
+- BDD acceptance criteria from `.opencode/sdlc/01-requirements.md`
+- Implementation summary from `.opencode/sdlc/03-development.md`
+
+Write and execute integration and E2E tests. Save the test report to `.opencode/sdlc/04-test-report.md`.
 
 $ARGUMENTS
-
-Write and execute:
-1. Integration tests
-2. End-to-end tests (covering all BDD scenarios)
-3. Performance tests (if constraints are specified)
-
-Save the test report to `.opencode/sdlc/test-report.md`.

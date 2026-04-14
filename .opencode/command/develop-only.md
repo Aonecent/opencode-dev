@@ -1,22 +1,15 @@
 ---
-description: Run only the TDD development phase — generates tests and implementation using Red-Green-Refactor
+description: Run only the TDD development phase — reads from 01-requirements.md and 02-design.md, produces code and 03-development.md
 agent: develop
 subtask: true
 ---
 
-Implement the feature using Test-Driven Development.
+Execute Phase 3 (TDD Development) of the SDLC pipeline.
 
-Read `.opencode/sdlc/requirements.md` and `.opencode/sdlc/design.md` if they exist. Otherwise use the description below.
+Read:
+- BDD requirements from `.opencode/sdlc/01-requirements.md`
+- DDD design from `.opencode/sdlc/02-design.md`
 
-Feature description:
+Implement the feature via Red-Green-Refactor and write the development summary to `.opencode/sdlc/03-development.md`.
 
 $ARGUMENTS
-
-Follow the Red-Green-Refactor cycle:
-1. Generate test cases (develop-testgen)
-2. Write failing tests (develop-red)
-3. Write minimal implementation (develop-green)
-4. Refactor (develop-refactor)
-5. Run full test suite (develop-guard)
-
-Save results to `.opencode/sdlc/development.md`.

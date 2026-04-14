@@ -1,19 +1,16 @@
 ---
-description: Run the full software development lifecycle — requirement → design → develop → test → deploy → ops
+description: Start the full SDLC pipeline — creates a task ledger and runs all phases from requirement through operations
 agent: orchestrator
 subtask: true
 ---
 
-Run the complete multi-agent SDLC pipeline for the following requirement:
+Start a new SDLC pipeline for the following requirement.
+
+The orchestrator will:
+1. Create `.opencode/sdlc/PLAN.md` as a file-based task ledger
+2. Run all 6 phases in order, each reading from and writing to artifact files
+3. Update the task ledger after each phase so the pipeline can be resumed if interrupted
+
+Requirement:
 
 $ARGUMENTS
-
-Execute all phases in sequence:
-1. Requirements Analysis (BDD)
-2. Domain-Driven Design
-3. Test-Driven Development
-4. Integration & E2E Testing
-5. Deployment Configuration
-6. Operations Readiness Review
-
-Report progress after each phase and provide a final summary.

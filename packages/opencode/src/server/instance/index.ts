@@ -219,6 +219,56 @@ export const InstanceRoutes = (upgrade: UpgradeWebSocket): Hono =>
         return c.json(skills)
       },
     )
+    .post(
+      "/skill/reload",
+      describeRoute({
+        summary: "Reload skills",
+        description:
+          "Rescan skill sources for the current project and hot-reload them without disposing the instance. Returns the set of skills added, removed, and changed since the previous snapshot.",
+        operationId: "skill.reload",
+        responses: {
+          200: {
+            description: "Reload result",
+            content: {
+              "application/json": {
+                schema: resolver(Skill.ReloadResult),
+              },
+            },
+          },
+        },
+      }),
+      async (c) => {
+        return c.json(await Skill.reload())
+      },
+    )
+    .get(
+      "/skill/:name",
+      describeRoute({
+        summary: "Get skill",
+        description: "Retrieve a single skill by name, including its full markdown content.",
+        operationId: "skill.get",
+        responses: {
+          200: {
+            description: "Skill",
+            content: {
+              "application/json": {
+                schema: resolver(Skill.Info),
+              },
+            },
+          },
+          404: {
+            description: "Skill not found",
+          },
+        },
+      }),
+      validator("param", z.object({ name: z.string() })),
+      async (c) => {
+        const { name } = c.req.valid("param")
+        const skill = await Skill.get(name)
+        if (!skill) return c.json({ message: `Skill not found: ${name}` }, 404)
+        return c.json(skill)
+      },
+    )
     .get(
       "/lsp",
       describeRoute({

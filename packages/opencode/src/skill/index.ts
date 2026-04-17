@@ -2,10 +2,11 @@ import os from "os"
 import path from "path"
 import { pathToFileURL } from "url"
 import z from "zod"
-import { Effect, Layer, Context } from "effect"
+import { Effect, Layer, Context, Semaphore } from "effect"
 import { NamedError } from "@opencode-ai/util/error"
 import type { Agent } from "@/agent/agent"
 import { Bus } from "@/bus"
+import { BusEvent } from "@/bus/bus-event"
 import { InstanceState } from "@/effect/instance-state"
 import { makeRuntime } from "@/effect/run-service"
 import { Flag } from "@/flag/flag"
@@ -32,6 +33,20 @@ export namespace Skill {
     content: z.string(),
   })
   export type Info = z.infer<typeof Info>
+
+  export const ReloadResult = z
+    .object({
+      added: z.string().array(),
+      removed: z.string().array(),
+      changed: z.string().array(),
+      total: z.number(),
+    })
+    .meta({ ref: "SkillReloadResult" })
+  export type ReloadResult = z.infer<typeof ReloadResult>
+
+  export const Event = {
+    Updated: BusEvent.define("skill.updated", ReloadResult),
+  }
 
   export const InvalidError = NamedError.create(
     "SkillInvalidError",
@@ -61,6 +76,7 @@ export namespace Skill {
     readonly all: () => Effect.Effect<Info[]>
     readonly dirs: () => Effect.Effect<string[]>
     readonly available: (agent?: Agent.Info) => Effect.Effect<Info[]>
+    readonly reload: () => Effect.Effect<ReloadResult>
   }
 
   const add = Effect.fnUntraced(function* (state: State, match: string, bus: Bus.Interface) {
@@ -187,6 +203,11 @@ export namespace Skill {
     log.info("init", { count: Object.keys(state.skills).length })
   })
 
+  type Container = {
+    current: State
+    lock: Semaphore.Semaphore
+  }
+
   export class Service extends Context.Service<Service, Interface>()("@opencode/Skill") {}
 
   export const layer = Layer.effect(
@@ -196,37 +217,61 @@ export namespace Skill {
       const config = yield* Config.Service
       const bus = yield* Bus.Service
       const fsys = yield* AppFileSystem.Service
-      const state = yield* InstanceState.make(
+      const state = yield* InstanceState.make<Container>(
         Effect.fn("Skill.state")(function* (ctx) {
-          const s: State = { skills: {}, dirs: new Set() }
-          yield* loadSkills(s, config, discovery, bus, fsys, ctx.directory, ctx.worktree)
-          return s
+          const inner: State = { skills: {}, dirs: new Set() }
+          yield* loadSkills(inner, config, discovery, bus, fsys, ctx.directory, ctx.worktree)
+          return { current: inner, lock: Semaphore.makeUnsafe(1) }
         }),
       )
 
       const get = Effect.fn("Skill.get")(function* (name: string) {
-        const s = yield* InstanceState.get(state)
-        return s.skills[name]
+        const c = yield* InstanceState.get(state)
+        return c.current.skills[name]
       })
 
       const all = Effect.fn("Skill.all")(function* () {
-        const s = yield* InstanceState.get(state)
-        return Object.values(s.skills)
+        const c = yield* InstanceState.get(state)
+        return Object.values(c.current.skills)
       })
 
       const dirs = Effect.fn("Skill.dirs")(function* () {
-        const s = yield* InstanceState.get(state)
-        return Array.from(s.dirs)
+        const c = yield* InstanceState.get(state)
+        return Array.from(c.current.dirs)
       })
 
       const available = Effect.fn("Skill.available")(function* (agent?: Agent.Info) {
-        const s = yield* InstanceState.get(state)
-        const list = Object.values(s.skills).toSorted((a, b) => a.name.localeCompare(b.name))
+        const c = yield* InstanceState.get(state)
+        const list = Object.values(c.current.skills).toSorted((a, b) => a.name.localeCompare(b.name))
         if (!agent) return list
         return list.filter((skill) => Permission.evaluate("skill", skill.name, agent.permission).action !== "deny")
       })
 
-      return Service.of({ get, all, dirs, available })
+      const reload = Effect.fn("Skill.reload")(function* () {
+        const ctx = yield* InstanceState.context
+        const c = yield* InstanceState.get(state)
+        return yield* c.lock.withPermits(1)(
+          Effect.gen(function* () {
+            const prev = c.current
+            const next: State = { skills: {}, dirs: new Set() }
+            yield* loadSkills(next, config, discovery, bus, fsys, ctx.directory, ctx.worktree)
+            const prevKeys = new Set(Object.keys(prev.skills))
+            const nextKeys = new Set(Object.keys(next.skills))
+            const added = [...nextKeys].filter((k) => !prevKeys.has(k)).toSorted()
+            const removed = [...prevKeys].filter((k) => !nextKeys.has(k)).toSorted()
+            const changed = [...nextKeys]
+              .filter((k) => prevKeys.has(k) && prev.skills[k].content !== next.skills[k].content)
+              .toSorted()
+            c.current = next
+            const result: ReloadResult = { added, removed, changed, total: nextKeys.size }
+            yield* bus.publish(Event.Updated, result)
+            log.info("reloaded", { added: added.length, removed: removed.length, changed: changed.length })
+            return result
+          }),
+        )
+      })
+
+      return Service.of({ get, all, dirs, available, reload })
     }),
   )
 
@@ -279,5 +324,9 @@ export namespace Skill {
 
   export async function available(agent?: Agent.Info) {
     return runPromise((skill) => skill.available(agent))
+  }
+
+  export async function reload() {
+    return runPromise((skill) => skill.reload())
   }
 }

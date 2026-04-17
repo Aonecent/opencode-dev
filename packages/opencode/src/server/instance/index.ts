@@ -11,6 +11,8 @@ import { Skill } from "../../skill"
 import { Global } from "../../global"
 import { LSP } from "../../lsp"
 import { Command } from "../../command"
+import { NotFoundError } from "../../storage/db"
+import { errors } from "../error"
 import { QuestionRoutes } from "./question"
 import { PermissionRoutes } from "./permission"
 import { ProjectRoutes } from "./project"
@@ -256,16 +258,14 @@ export const InstanceRoutes = (upgrade: UpgradeWebSocket): Hono =>
               },
             },
           },
-          404: {
-            description: "Skill not found",
-          },
+          ...errors(404),
         },
       }),
       validator("param", z.object({ name: z.string() })),
       async (c) => {
         const { name } = c.req.valid("param")
         const skill = await Skill.get(name)
-        if (!skill) return c.json({ message: `Skill not found: ${name}` }, 404)
+        if (!skill) throw new NotFoundError({ message: `Skill not found: ${name}` })
         return c.json(skill)
       },
     )

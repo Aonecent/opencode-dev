@@ -71,6 +71,11 @@ export namespace Skill {
     dirs: Set<string>
   }
 
+  type Container = {
+    current: State
+    lock: Semaphore.Semaphore
+  }
+
   export interface Interface {
     readonly get: (name: string) => Effect.Effect<Info | undefined>
     readonly all: () => Effect.Effect<Info[]>
@@ -203,11 +208,6 @@ export namespace Skill {
     log.info("init", { count: Object.keys(state.skills).length })
   })
 
-  type Container = {
-    current: State
-    lock: Semaphore.Semaphore
-  }
-
   export class Service extends Context.Service<Service, Interface>()("@opencode/Skill") {}
 
   export const layer = Layer.effect(
@@ -255,15 +255,15 @@ export namespace Skill {
             const prev = c.current
             const next: State = { skills: {}, dirs: new Set() }
             yield* loadSkills(next, config, discovery, bus, fsys, ctx.directory, ctx.worktree)
-            const prevKeys = new Set(Object.keys(prev.skills))
-            const nextKeys = new Set(Object.keys(next.skills))
-            const added = [...nextKeys].filter((k) => !prevKeys.has(k)).toSorted()
-            const removed = [...prevKeys].filter((k) => !nextKeys.has(k)).toSorted()
-            const changed = [...nextKeys]
-              .filter((k) => prevKeys.has(k) && prev.skills[k].content !== next.skills[k].content)
+            const before = new Set(Object.keys(prev.skills))
+            const after = new Set(Object.keys(next.skills))
+            const added = [...after].filter((k) => !before.has(k)).toSorted()
+            const removed = [...before].filter((k) => !after.has(k)).toSorted()
+            const changed = [...after]
+              .filter((k) => before.has(k) && prev.skills[k].content !== next.skills[k].content)
               .toSorted()
             c.current = next
-            const result: ReloadResult = { added, removed, changed, total: nextKeys.size }
+            const result: ReloadResult = { added, removed, changed, total: after.size }
             yield* bus.publish(Event.Updated, result)
             log.info("reloaded", { added: added.length, removed: removed.length, changed: changed.length })
             return result

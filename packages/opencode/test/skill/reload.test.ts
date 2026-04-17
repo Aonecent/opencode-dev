@@ -9,14 +9,14 @@ afterEach(async () => {
   await Instance.disposeAll()
 })
 
-async function writeSkill(dir: string, name: string, description: string, body = "") {
-  const skillDir = path.join(dir, ".opencode", "skill", name)
-  await fs.mkdir(skillDir, { recursive: true })
+async function write(dir: string, name: string, desc: string, body = "") {
+  const root = path.join(dir, ".opencode", "skill", name)
+  await fs.mkdir(root, { recursive: true })
   await Bun.write(
-    path.join(skillDir, "SKILL.md"),
+    path.join(root, "SKILL.md"),
     `---
 name: ${name}
-description: ${description}
+description: ${desc}
 ---
 
 # ${name}
@@ -33,7 +33,7 @@ test("reload picks up newly added skills", async () => {
     fn: async () => {
       expect((await Skill.all()).length).toBe(0)
 
-      await writeSkill(tmp.path, "fresh-skill", "A brand new skill.")
+      await write(tmp.path, "fresh-skill", "A brand new skill.")
       const result = await Skill.reload()
       expect(result.added).toEqual(["fresh-skill"])
       expect(result.removed).toEqual([])
@@ -51,8 +51,8 @@ test("reload detects removed and changed skills", async () => {
   await using tmp = await tmpdir({
     git: true,
     init: async (dir) => {
-      await writeSkill(dir, "keeper", "Stays around.")
-      await writeSkill(dir, "goner", "Will be deleted.")
+      await write(dir, "keeper", "Stays around.")
+      await write(dir, "goner", "Will be deleted.")
     },
   })
 
@@ -62,7 +62,7 @@ test("reload detects removed and changed skills", async () => {
       expect((await Skill.all()).length).toBe(2)
 
       await fs.rm(path.join(tmp.path, ".opencode", "skill", "goner"), { recursive: true, force: true })
-      await writeSkill(tmp.path, "keeper", "Stays around.", "updated body")
+      await write(tmp.path, "keeper", "Stays around.", "updated body")
 
       const result = await Skill.reload()
       expect(result.removed).toEqual(["goner"])
